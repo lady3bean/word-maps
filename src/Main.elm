@@ -1,10 +1,10 @@
 module Main exposing (..)
 
 import Browser
-import Html exposing (Html, pre, text)
+import Html exposing (Html, div, pre, text)
 import Html.Attributes exposing (src)
 import Http
-import Json.Decode exposing (Decoder, field, string)
+import Json.Decode as Decode exposing (Decoder, field, int, string)
 
 
 
@@ -22,7 +22,7 @@ apiUrl =
 type Model
     = Failure
     | Loading
-    | Success String
+    | Success BaseWordData
 
 
 type Word
@@ -32,14 +32,16 @@ type Word
 
 type alias BaseWordData =
     { id : Int
-    , definition : WordDefiniton
+
+    -- , definition : WordDefiniton
     , spelling : String
     , language_id : Int
-    , origins : RelatedWords
-    , origin_ofs : RelatedWords
-    , relations : RelatedWords
-    , derivations : RelatedWords
-    , derived_froms : RelatedWords
+
+    -- , origins : RelatedWords
+    -- , origin_ofs : RelatedWords
+    -- , relations : RelatedWords
+    -- , derivations : RelatedWords
+    -- , derived_froms : RelatedWords
     , language : Language
     }
 
@@ -69,6 +71,14 @@ type alias Language =
     }
 
 
+
+--- UPDATE ---
+
+
+type Msg
+    = GotWord (Result Http.Error BaseWordData)
+
+
 init : ( Model, Cmd Msg )
 init =
     ( Loading
@@ -80,17 +90,8 @@ getWord : Cmd Msg
 getWord =
     Http.get
         { url = apiUrl ++ "wheel"
-        , expect = Http.expectJson GotWord spellingDecoder
+        , expect = Http.expectJson GotWord baseWordDecoder
         }
-
-
-spellingDecoder : Decoder String
-spellingDecoder =
-    field "spelling" string
-
-
-type Msg
-    = GotWord (Result Http.Error String)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -119,7 +120,7 @@ view model =
             text "Loading..."
 
         Success word ->
-            pre [] [ text word ]
+            div [] [ text (Debug.toString model) ]
 
 
 
@@ -134,3 +135,45 @@ main =
         , update = update
         , subscriptions = always Sub.none
         }
+
+
+
+--- DECODERS ---
+
+
+baseWordDecoder : Decoder BaseWordData
+baseWordDecoder =
+    Decode.map4
+        BaseWordData
+        (field "id" int)
+        -- (field "definition" definitonDecoder)
+        (field "spelling" string)
+        (field "language_id" int)
+        (field "language" languageDecoder)
+
+
+
+-- (field "origins" relatedWordsDecoder)
+-- (field "origin_ofs" relatedWordsDecoder)
+-- (field "relations" relatedWordsDecoder)
+-- (field "derivations" relatedWordsDecoder)
+-- (field "derived_froms" relatedWordsDecoder)
+-- definitonDecoder : WordDefiniton -> Decoder String
+-- definitonDecoder def =
+--     case Decode.decodeString def of
+--         Ok definition ->
+--             definition
+--         Err _ ->
+--             "We seem to be missing the definition for this word"
+-- relatedWordsDecoder : Decoder RelatedWords
+-- relatedWordsDecoder =
+--     Decode.list RelatedWordData
+
+
+languageDecoder : Decoder Language
+languageDecoder =
+    Decode.map3
+        Language
+        (field "id" int)
+        (field "iso_code" string)
+        (field "name" string)
