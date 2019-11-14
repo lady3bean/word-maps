@@ -4,6 +4,7 @@ import Browser
 import Html exposing (Html, pre, text)
 import Html.Attributes exposing (src)
 import Http
+import Json.Decode exposing (Decoder, field, string)
 
 
 
@@ -71,35 +72,31 @@ type alias Language =
 init : ( Model, Cmd Msg )
 init =
     ( Loading
-    , Http.get
-        { url = apiUrl ++ "wheel"
-        , expect = Http.expectString GotText
-        }
+    , getWord
     )
 
 
-buildWordTree : Word -> Word
-buildWordTree word =
-    case word of
-        BaseWord data ->
-            BaseWord data
-
-        RelatedWord data ->
-            RelatedWord data
+getWord : Cmd Msg
+getWord =
+    Http.get
+        { url = apiUrl ++ "wheel"
+        , expect = Http.expectJson GotWord spellingDecoder
+        }
 
 
-
----- UPDATE ----
+spellingDecoder : Decoder String
+spellingDecoder =
+    field "spelling" string
 
 
 type Msg
-    = GotText (Result Http.Error String)
+    = GotWord (Result Http.Error String)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        GotText result ->
+        GotWord result ->
             case result of
                 Ok word ->
                     ( Success word, Cmd.none )
