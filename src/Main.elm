@@ -25,30 +25,40 @@ type Model
 
 
 type Word
-    = BaseWord WordData
+    = BaseWord BaseWordData
     | RelatedWord RelatedWordData
 
 
-type alias WordData =
+type alias BaseWordData =
     { id : Int
-    , definition : String
+    , definition : WordDefiniton
     , spelling : String
     , language_id : Int
-    , origins : List Word
-    , origin_ofs : List Word
-    , relations : List Word
-    , derivations : List Word
-    , derived_froms : List Word
+    , origins : RelatedWords
+    , origin_ofs : RelatedWords
+    , relations : RelatedWords
+    , derivations : RelatedWords
+    , derived_froms : RelatedWords
     , language : Language
     }
 
 
 type alias RelatedWordData =
     { id : Int
-    , definition : String
+    , definition : WordDefiniton
     , spelling : String
     , language_id : Int
     }
+
+
+type WordDefiniton
+    = MissingMessage String
+    | Present String
+
+
+type RelatedWords
+    = NoDataMessage String
+    | Relateds (List Word)
 
 
 type alias Language =
