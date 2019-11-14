@@ -1,20 +1,37 @@
 module Main exposing (..)
 
 import Browser
-import Html exposing (Html, text, div, h1, img)
+import Html exposing (Html, pre, text)
 import Html.Attributes exposing (src)
+import Http
+
+
+
+--- CONSTANTS ---
+
+
+apiUrl =
+    "http://localhost:3000/words?spelling="
+
 
 
 ---- MODEL ----
 
 
-type alias Model =
-    {}
+type Model
+    = Failure
+    | Loading
+    | Success String
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( {}, Cmd.none )
+    ( Loading
+    , Http.get
+        { url = apiUrl ++ "wheel"
+        , expect = Http.expectString GotText
+        }
+    )
 
 
 
@@ -22,12 +39,19 @@ init =
 
 
 type Msg
-    = NoOp
+    = GotText (Result Http.Error String)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        GotText result ->
+            case result of
+                Ok word ->
+                    ( Success word, Cmd.none )
+
+                Err _ ->
+                    ( Failure, Cmd.none )
 
 
 
@@ -36,10 +60,15 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ img [ src "/logo.svg" ] []
-        , h1 [] [ text "Your Elm App is working!" ]
-        ]
+    case model of
+        Failure ->
+            text "Failed to load word data"
+
+        Loading ->
+            text "Loading..."
+
+        Success word ->
+            pre [] [ text word ]
 
 
 
