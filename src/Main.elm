@@ -24,6 +24,40 @@ type Model
     | Success String
 
 
+type Word
+    = BaseWord WordData
+    | RelatedWord RelatedWordData
+
+
+type alias WordData =
+    { id : Int
+    , definition : String
+    , spelling : String
+    , language_id : Int
+    , origins : List Word
+    , origin_ofs : List Word
+    , relations : List Word
+    , derivations : List Word
+    , derived_froms : List Word
+    , language : Language
+    }
+
+
+type alias RelatedWordData =
+    { id : Int
+    , definition : String
+    , spelling : String
+    , language_id : Int
+    }
+
+
+type alias Language =
+    { id : Int
+    , iso_code : String
+    , name : String
+    }
+
+
 init : ( Model, Cmd Msg )
 init =
     ( Loading
@@ -32,6 +66,16 @@ init =
         , expect = Http.expectString GotText
         }
     )
+
+
+buildWordTree : Word -> Word
+buildWordTree word =
+    case word of
+        BaseWord data ->
+            BaseWord data
+
+        RelatedWord data ->
+            RelatedWord data
 
 
 
