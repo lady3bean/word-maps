@@ -5,6 +5,7 @@ import Html exposing (Html, div, pre, text)
 import Html.Attributes exposing (src)
 import Http
 import Json.Decode as Decode exposing (Decoder, field, int, string)
+import Json.Decode.Field as Field
 
 
 
@@ -32,8 +33,7 @@ type Word
 
 type alias BaseWordData =
     { id : Int
-
-    -- , definition : WordDefiniton
+    , definition : WordDefiniton
     , spelling : String
     , language_id : Int
 
@@ -56,7 +56,7 @@ type alias RelatedWordData =
 
 type WordDefiniton
     = MissingMessage String
-    | Present String
+    | Definition String
 
 
 type RelatedWords
@@ -143,10 +143,10 @@ main =
 
 baseWordDecoder : Decoder BaseWordData
 baseWordDecoder =
-    Decode.map4
+    Decode.map5
         BaseWordData
         (field "id" int)
-        -- (field "definition" definitonDecoder)
+        (field "definition" definitonDecoder)
         (field "spelling" string)
         (field "language_id" int)
         (field "language" languageDecoder)
@@ -158,13 +158,22 @@ baseWordDecoder =
 -- (field "relations" relatedWordsDecoder)
 -- (field "derivations" relatedWordsDecoder)
 -- (field "derived_froms" relatedWordsDecoder)
--- definitonDecoder : WordDefiniton -> Decoder String
--- definitonDecoder def =
---     case Decode.decodeString def of
---         Ok definition ->
---             definition
---         Err _ ->
---             "We seem to be missing the definition for this word"
+
+
+definitonDecoder : Decoder WordDefiniton
+definitonDecoder =
+    Field.attempt "definition" Decode.string <|
+        \maybeDef ->
+            case maybeDef of
+                Just def ->
+                    Definition def
+                        |> Decode.succeed
+
+                _ ->
+                    Decode.succeed (MissingMessage "We seem to be missing this word's definition")
+
+
+
 -- relatedWordsDecoder : Decoder RelatedWords
 -- relatedWordsDecoder =
 --     Decode.list RelatedWordData
