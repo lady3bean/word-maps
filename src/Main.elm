@@ -6,6 +6,7 @@ import Html.Attributes exposing (src)
 import Http
 import Json.Decode as Decode exposing (Decoder, field, int, string)
 import Json.Decode.Field as Field
+import Json.Decode.Pipeline exposing (optional, required)
 
 
 
@@ -36,12 +37,11 @@ type alias BaseWordData =
     , definition : WordDefiniton
     , spelling : String
     , language_id : Int
-
-    -- , origins : RelatedWords
-    -- , origin_ofs : RelatedWords
-    -- , relations : RelatedWords
-    -- , derivations : RelatedWords
-    -- , derived_froms : RelatedWords
+    , origins : List RelatedWordData
+    , origin_ofs : List RelatedWordData
+    , relations : List RelatedWordData
+    , derivations : List RelatedWordData
+    , derived_froms : List RelatedWordData
     , language : Language
     }
 
@@ -57,11 +57,6 @@ type alias RelatedWordData =
 type WordDefiniton
     = MissingMessage String
     | Definition String
-
-
-type RelatedWords
-    = NoDataMessage String
-    | Relateds (List Word)
 
 
 type alias Language =
@@ -143,21 +138,18 @@ main =
 
 baseWordDecoder : Decoder BaseWordData
 baseWordDecoder =
-    Decode.map5
+    Decode.map11
         BaseWordData
         (field "id" int)
         (field "definition" definitonDecoder)
         (field "spelling" string)
         (field "language_id" int)
+        (field "origins" relatedWordDataDecoder)
         (field "language" languageDecoder)
-
-
-
--- (field "origins" relatedWordsDecoder)
--- (field "origin_ofs" relatedWordsDecoder)
--- (field "relations" relatedWordsDecoder)
--- (field "derivations" relatedWordsDecoder)
--- (field "derived_froms" relatedWordsDecoder)
+        (field "origin_ofs" relatedWordDataDecoder)
+        (field "relations" relatedWordDataDecoder)
+        (field "derivations" relatedWordDataDecoder)
+        (field "derived_froms" relatedWordDataDecoder)
 
 
 definitonDecoder : Decoder WordDefiniton
@@ -173,10 +165,16 @@ definitonDecoder =
                     Decode.succeed (MissingMessage "We seem to be missing this word's definition")
 
 
-
--- relatedWordsDecoder : Decoder RelatedWords
--- relatedWordsDecoder =
---     Decode.list RelatedWordData
+relatedWordDataDecoder : Decoder (List RelatedWordData)
+relatedWordDataDecoder =
+    Decode.list
+        (Decode.map4
+            RelatedWordData
+            (field "id" int)
+            (field "definition" definitonDecoder)
+            (field "spelling" string)
+            (field "language_id" int)
+        )
 
 
 languageDecoder : Decoder Language
