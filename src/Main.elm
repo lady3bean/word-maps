@@ -1,13 +1,11 @@
 module Main exposing (..)
 
 import Browser
-import Html exposing (Html, div, pre, text)
+import Html exposing (Html, div, pre, text, ul, li)
 import Html.Attributes exposing (src)
 import Http
 import Json.Decode as Decode exposing (Decoder, field, int, string)
 import Json.Decode.Field as Field
-import Json.Decode.Pipeline exposing (optional, required, requiredAt)
-
 
 
 --- CONSTANTS ---
@@ -105,7 +103,7 @@ update msg model =
 ---- VIEW ----
 
 
-view : Model -> Html Msg
+view : Model -> Html msg
 view model =
     case model of
         Failure ->
@@ -115,9 +113,59 @@ view model =
             text "Loading..."
 
         Success word ->
-            div [] [ text (Debug.toString model) ]
+            div [] [
+                    div [] [text ("spelling: " ++ word.spelling)]
+                    , div [] [text ("language: " ++ word.language.name)]
+                    , div []
+                        [
+                        text "origins: "
+                        , renderRelatedWordList word.origins
+                        ]
+                    , div []
+                        [
+                        text "origin of: "
+                        , renderRelatedWordList word.origin_ofs
+                        ]
+                    , div []
+                        [
+                        text "relations: "
+                        , renderRelatedWordList word.relations
+                        ]
+                    , div []
+                        [
+                        text "derivations: "
+                        , renderRelatedWordList word.derivations
+                        ]
+                    , div []
+                        [
+                        text "derived from: "
+                        , renderRelatedWordList word.derived_froms
+                        ]
+                    ]
+            -- case word.definition of
+            --     Definition def ->
+
+            --         div []
+            --             [ text word.spelling
+            --             , text def
+            --             ]
+
+            --     MissingMessage msg ->
+            --         div [] [text msg ]
 
 
+
+
+renderRelatedWordSpelling : RelatedWordData -> Html msg
+renderRelatedWordSpelling word =
+    li [] [ text word.spelling ]
+
+renderRelatedWordList : List RelatedWordData -> Html msg
+renderRelatedWordList list =
+    let
+        listItems = List.map renderRelatedWordSpelling list
+    in
+        ul [] listItems
 
 ---- PROGRAM ----
 
