@@ -6,7 +6,7 @@ import Html.Attributes exposing (src)
 import Http
 import Json.Decode as Decode exposing (Decoder, field, int, string)
 import Json.Decode.Field as Field
-import Json.Decode.Pipeline exposing (optional, required)
+import Json.Decode.Pipeline exposing (optional, required, requiredAt)
 
 
 
@@ -138,18 +138,29 @@ main =
 
 baseWordDecoder : Decoder BaseWordData
 baseWordDecoder =
-    Decode.map11
-        BaseWordData
-        (field "id" int)
-        (field "definition" definitonDecoder)
-        (field "spelling" string)
-        (field "language_id" int)
-        (field "origins" relatedWordDataDecoder)
-        (field "language" languageDecoder)
-        (field "origin_ofs" relatedWordDataDecoder)
-        (field "relations" relatedWordDataDecoder)
-        (field "derivations" relatedWordDataDecoder)
-        (field "derived_froms" relatedWordDataDecoder)
+        Field.require "id" int <| \id ->
+        Field.require "definition" definitonDecoder <| \definition ->
+        Field.require "spelling" string <| \spelling ->
+        Field.require "language_id" int <| \language_id ->
+        Field.require "origins" relatedWordDataDecoder <| \origins ->
+        Field.require "language" languageDecoder <| \language ->
+        Field.require "origin_ofs" relatedWordDataDecoder <| \origin_ofs ->
+        Field.require "relations" relatedWordDataDecoder <| \relations ->
+        Field.require "derivations" relatedWordDataDecoder <| \derivations ->
+        Field.require "derived_froms" relatedWordDataDecoder <| \derived_froms ->
+
+        Decode.succeed
+            { id = id
+            , definition = definition
+            , spelling = spelling
+            , language_id = language_id
+            , origins = origins
+            , origin_ofs = origin_ofs
+            , relations = relations
+            , derivations = derivations
+            , derived_froms = derived_froms
+            , language = language
+            }
 
 
 definitonDecoder : Decoder WordDefiniton
