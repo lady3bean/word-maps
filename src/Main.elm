@@ -2,7 +2,6 @@ module Main exposing (..)
 
 import Browser
 import Html exposing (Html, div, pre, text, ul, li)
-import Html.Attributes exposing (src)
 import Http
 import Json.Decode as Decode exposing (Decoder, field, int, string)
 import Json.Decode.Field as Field
@@ -32,7 +31,7 @@ type Word
 
 type alias BaseWordData =
     { id : Int
-    , definition : WordDefiniton
+    , definition : Maybe String
     , spelling : String
     , language_id : Int
     , origins : List RelatedWordData
@@ -43,19 +42,12 @@ type alias BaseWordData =
     , language : Language
     }
 
-
 type alias RelatedWordData =
     { id : Int
-    , definition : WordDefiniton
+    , definition : Maybe String
     , spelling : String
     , language_id : Int
     }
-
-
-type WordDefiniton
-    = MissingMessage String
-    | Definition String
-
 
 type alias Language =
     { id : Int
@@ -64,13 +56,12 @@ type alias Language =
     }
 
 
-
 --- UPDATE ---
+
 
 
 type Msg
     = GotWord (Result Http.Error BaseWordData)
-
 
 init : ( Model, Cmd Msg )
 init =
@@ -117,6 +108,8 @@ view model =
                     div [] [text ("spelling: " ++ word.spelling)]
                     , div [] [text ("language: " ++ word.language.name)]
                     , div []
+                        [text ("definition: " ++ (Maybe.withDefault "We seem to be missing this word's definition" word.definition))]
+                    , div []
                         [
                         text "origins: "
                         , renderRelatedWordList word.origins
@@ -142,17 +135,6 @@ view model =
                         , renderRelatedWordList word.derived_froms
                         ]
                     ]
-            -- case word.definition of
-            --     Definition def ->
-
-            --         div []
-            --             [ text word.spelling
-            --             , text def
-            --             ]
-
-            --     MissingMessage msg ->
-            --         div [] [text msg ]
-
 
 
 
@@ -187,7 +169,7 @@ main =
 baseWordDecoder : Decoder BaseWordData
 baseWordDecoder =
         Field.require "id" int <| \id ->
-        Field.require "definition" definitonDecoder <| \definition ->
+        Field.attempt "definition" string <| \definition ->
         Field.require "spelling" string <| \spelling ->
         Field.require "language_id" int <| \language_id ->
         Field.require "origins" relatedWordDataDecoder <| \origins ->
@@ -211,30 +193,21 @@ baseWordDecoder =
             }
 
 
-definitonDecoder : Decoder WordDefiniton
-definitonDecoder =
-    Field.attempt "definition" Decode.string <|
-        \maybeDef ->
-            case maybeDef of
-                Just def ->
-                    Definition def
-                        |> Decode.succeed
-
-                _ ->
-                    Decode.succeed (MissingMessage "We seem to be missing this word's definition")
-
-
 relatedWordDataDecoder : Decoder (List RelatedWordData)
 relatedWordDataDecoder =
-    Decode.list
-        (Decode.map4
-            RelatedWordData
-            (field "id" int)
-            (field "definition" definitonDecoder)
-            (field "spelling" string)
-            (field "language_id" int)
-        )
+    Decode.list(
+        Field.require "id" int <| \id ->
+        Field.attempt "definition" string <| \definition ->
+        Field.require "spelling" string <| \spelling ->
+        Field.require "language_id" int <| \language_id ->
 
+        Decode.succeed
+            { id = id
+            , definition = definition
+            , spelling = spelling
+            , language_id = language_id
+        }
+    )
 
 languageDecoder : Decoder Language
 languageDecoder =
