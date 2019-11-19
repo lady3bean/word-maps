@@ -2,9 +2,9 @@ module Main exposing (..)
 
 import Browser
 import Html exposing (Html, button, div, input, li, pre, text, ul)
-import Html.Events exposing (onClick, onInput)
+import Html.Events exposing (on, onClick, onInput)
 import Http
-import Json.Decode as Decode exposing (Decoder, field, int, string)
+import Json.Decode as Decode exposing (Decoder, int, string)
 import Json.Decode.Field as Field
 
 
@@ -81,6 +81,7 @@ type Msg
     = FetchWord
     | GotWord (Result Http.Error BaseWordData)
     | UpdateLookupValue String
+    | RelatedWordLookup String
 
 
 init : ( Model, Cmd Msg )
@@ -114,6 +115,9 @@ update msg model =
 
         UpdateLookupValue value ->
             ( { model | lookupValue = value }, Cmd.none )
+
+        RelatedWordLookup word ->
+            ( { model | pageState = Loading }, fetchWord word )
 
 
 
@@ -170,12 +174,12 @@ view model =
                 ]
 
 
-renderRelatedWordSpelling : RelatedWordData -> Html msg
+renderRelatedWordSpelling : RelatedWordData -> Html Msg
 renderRelatedWordSpelling word =
-    li [] [ text word.spelling ]
+    li [ onClick (RelatedWordLookup word.spelling) ] [ text word.spelling ]
 
 
-renderRelatedWordList : List RelatedWordData -> Html msg
+renderRelatedWordList : List RelatedWordData -> Html Msg
 renderRelatedWordList list =
     let
         listItems =
@@ -272,8 +276,14 @@ relatedWordDataDecoder =
 
 languageDecoder : Decoder Language
 languageDecoder =
-    Decode.map3
-        Language
-        (field "id" int)
-        (field "iso_code" string)
-        (field "name" string)
+    Field.require "id" int <|
+        \id ->
+            Field.require "iso_code" string <|
+                \iso_code ->
+                    Field.require "name" string <|
+                        \name ->
+                            Decode.succeed
+                                { id = id
+                                , iso_code = iso_code
+                                , name = name
+                                }
