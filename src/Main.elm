@@ -1,19 +1,41 @@
 module Main exposing (..)
 
 import Browser
+import Browser.Events
+import Color
+import Force exposing (State)
+import Graph exposing (Edge, Graph, Node, NodeContext, NodeId)
 import Html exposing (Html, button, div, input, li, pre, text, ul)
 import Html.Events exposing (on, onClick, onInput)
+import Html.Events.Extra.Mouse as Mouse
 import Http
 import Json.Decode as Decode exposing (Decoder, int, string)
 import Json.Decode.Field as Field
+import Time
+import TypedSvg exposing (circle, g, line, svg, title)
+import TypedSvg.Attributes exposing (class, fill, stroke, viewBox)
+import TypedSvg.Attributes.InPx exposing (cx, cy, r, strokeWidth, x1, x2, y1, y2)
+import TypedSvg.Core exposing (Attribute, Svg, text)
+import TypedSvg.Types exposing (Fill(..))
 
 
 
 --- CONSTANTS ---
 
 
+apiUrl : String
 apiUrl =
     "http://localhost:3000/words?spelling="
+
+
+w : Float
+w =
+    990
+
+
+h : Float
+h =
+    504
 
 
 
@@ -23,14 +45,18 @@ apiUrl =
 type alias Model =
     { lookupValue : String
     , pageState : PageState
+    , graph : Graph Entity ()
+    , simulation : Force.State NodeId
     }
 
 
-initialModel : Model
-initialModel =
-    { lookupValue = ""
-    , pageState = Loading
-    }
+
+-- initialModel : Model
+-- initialModel =
+--     { lookupValue = ""
+--     , pageState = Loading
+--     , graph =
+--     }
 
 
 type PageState
@@ -73,6 +99,10 @@ type alias Language =
     }
 
 
+type alias Entity =
+    Force.Entity NodeId { value : String }
+
+
 
 --- UPDATE ---
 
@@ -84,11 +114,30 @@ type Msg
     | RelatedWordLookup String
 
 
+initializeNode : NodeContext String () -> NodeContext Entity ()
+initializeNode ctx =
+    { node = { label = Force.entity ctx.node.id ctx.node.label, id = ctx.node.id }
+    , incoming = ctx.incoming
+    , outgoing = ctx.outgoing
+    }
+
+
 init : ( Model, Cmd Msg )
 init =
-    ( initialModel
-    , Cmd.none
-    )
+    let
+        graph =
+            Graph.mapContexts initializeNode wordGraph
+
+        link { from, to } =
+            ( from, to )
+
+        forces =
+            [ Force.links <| List.map link <| Graph.edges graph
+            , Force.manyBody <| List.map .id <| Graph.nodes graph
+            , Force.center (w / 2) (h / 2)
+            ]
+    in
+    ( Model "test" Loading graph (Force.simulation forces), Cmd.none )
 
 
 fetchWord : String -> Cmd Msg
@@ -122,61 +171,57 @@ update msg model =
 
 
 ---- VIEW ----
-
-
-view : Model -> Html Msg
-view model =
-    case model.pageState of
-        Failure ->
-            div []
-                [ text "Failed to load word data. Please look up another word."
-                , wordLookupInput
-                , wordLookupButton
-                ]
-
-        Loading ->
-            div []
-                [ text "Loading... If you'd like, you can look up another word"
-                , wordLookupInput
-                , wordLookupButton
-                ]
-
-        Success word ->
-            div []
-                [ div [] [ text ("spelling: " ++ word.spelling) ]
-                , div [] [ text ("language: " ++ word.language.name) ]
-                , div []
-                    [ text ("definition: " ++ Maybe.withDefault "We seem to be missing this word's definition" word.definition) ]
-                , div []
-                    [ text "origins: "
-                    , renderRelatedWordList word.origins
-                    ]
-                , div []
-                    [ text "origin of: "
-                    , renderRelatedWordList word.origin_ofs
-                    ]
-                , div []
-                    [ text "relations: "
-                    , renderRelatedWordList word.relations
-                    ]
-                , div []
-                    [ text "derivations: "
-                    , renderRelatedWordList word.derivations
-                    ]
-                , div []
-                    [ text "derived from: "
-                    , renderRelatedWordList word.derived_froms
-                    ]
-                , div []
-                    [ wordLookupInput
-                    , wordLookupButton
-                    ]
-                ]
+-- view : Model -> Html Msg
+-- view model =
+--     case model.pageState of
+--         Failure ->
+--             div []
+--                 [ Html.text "Failed to load word data. Please look up another word."
+--                 , wordLookupInput
+--                 , wordLookupButton
+--                 ]
+--         Loading ->
+--             div []
+--                 [ Html.text "Loading... If you'd like, you can look up another word"
+--                 , wordLookupInput
+--                 , wordLookupButton
+--                 ]
+--         Success word ->
+--             div []
+--                 [ div [] [ Html.text ("spelling: " ++ word.spelling) ]
+--                 , div [] [ Html.text ("language: " ++ word.language.name) ]
+--                 , div []
+--                     [ Html.text ("definition: " ++ Maybe.withDefault "We seem to be missing this word's definition" word.definition) ]
+--                 , div []
+--                     [ Html.text "origins: "
+--                     , renderRelatedWordList word.origins
+--                     ]
+--                 , div []
+--                     [ Html.text "origin of: "
+--                     , renderRelatedWordList word.origin_ofs
+--                     ]
+--                 , div []
+--                     [ Html.text "relations: "
+--                     , renderRelatedWordList word.relations
+--                     ]
+--                 , div []
+--                     [ Html.text "derivations: "
+--                     , renderRelatedWordList word.derivations
+--                     ]
+--                 , div []
+--                     [ Html.text "derived from: "
+--                     , renderRelatedWordList word.derived_froms
+--                     ]
+--                 , div []
+--                     [ wordLookupInput
+--                     , wordLookupButton
+--                     ]
+--                 ]
 
 
 renderRelatedWordSpelling : RelatedWordData -> Html Msg
 renderRelatedWordSpelling word =
-    li [ onClick (RelatedWordLookup word.spelling) ] [ text word.spelling ]
+    li [ onClick (RelatedWordLookup word.spelling) ] [ Html.text word.spelling ]
 
 
 renderRelatedWordList : List RelatedWordData -> Html Msg
@@ -197,7 +242,71 @@ wordLookupInput =
 
 wordLookupButton : Html Msg
 wordLookupButton =
-    button [ onClick FetchWord ] [ text "Look up" ]
+    button [ onClick FetchWord ] [ Html.text "Look up" ]
+
+
+
+---- GRAPHING ----
+-- wordGraph : BaseWordData -> List RelatedWordData -> List ( NodeId, NodeId ) -> Graph n
+-- wordGraph baseWord relatedWords =
+
+
+wordGraph : Graph String ()
+wordGraph =
+    let
+        labels =
+            [ "bean", "been" ]
+
+        edges =
+            [ ( 0, 0 )
+            , ( 1, 0 )
+            ]
+    in
+    Graph.fromNodeLabelsAndEdgePairs labels edges
+
+
+linkElement graph edge =
+    let
+        source =
+            Maybe.withDefault (Force.entity 0 "") <| Maybe.map (.node >> .label) <| Graph.get edge.from graph
+
+        target =
+            Maybe.withDefault (Force.entity 0 "") <| Maybe.map (.node >> .label) <| Graph.get edge.to graph
+    in
+    line
+        [ strokeWidth 1
+        , stroke (Color.rgb255 170 170 170)
+        , x1 source.x
+        , y1 source.y
+        , x2 target.x
+        , y2 target.y
+        ]
+        []
+
+
+nodeElement node =
+    circle
+        [ r 2.5
+        , fill (Fill Color.black)
+        , stroke (Color.rgba 0 0 0 0)
+        , strokeWidth 7
+        , Mouse.onDown node.id
+        , cx node.label.x
+        , cy node.label.y
+        ]
+        [ title [] [ Html.text node.label.value ] ]
+
+
+view : Model -> Svg Msg
+view model =
+    svg [ viewBox 0 0 w h ]
+        [ Graph.edges model.graph
+            |> List.map (linkElement model.graph)
+            |> g [ class [ "links" ] ]
+        , Graph.nodes model.graph
+            |> List.map nodeElement
+            |> g [ class [ "nodes" ] ]
+        ]
 
 
 
