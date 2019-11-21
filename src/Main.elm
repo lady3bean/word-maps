@@ -45,6 +45,7 @@ h =
 type alias Model =
     { lookupValue : String
     , pageState : PageState
+    , drag : Maybe Drag
     , graph : Graph Entity ()
     , simulation : Force.State NodeId
     }
@@ -99,6 +100,13 @@ type alias Language =
     }
 
 
+type alias Drag =
+    { start : ( Float, Float )
+    , current : ( Float, Float )
+    , index : NodeId
+    }
+
+
 type alias Entity =
     Force.Entity NodeId { value : String }
 
@@ -112,6 +120,7 @@ type Msg
     | GotWord (Result Http.Error BaseWordData)
     | UpdateLookupValue String
     | RelatedWordLookup String
+    | DragStart NodeId ( Float, Float )
 
 
 initializeNode : NodeContext String () -> NodeContext Entity ()
@@ -122,8 +131,8 @@ initializeNode ctx =
     }
 
 
-init : ( Model, Cmd Msg )
-init =
+init : () -> ( Model, Cmd Msg )
+init _ =
     let
         graph =
             Graph.mapContexts initializeNode wordGraph
@@ -137,7 +146,7 @@ init =
             , Force.center (w / 2) (h / 2)
             ]
     in
-    ( Model "test" Loading graph (Force.simulation forces), Cmd.none )
+    ( Model "test" Loading Nothing graph (Force.simulation forces), Cmd.none )
 
 
 fetchWord : String -> Cmd Msg
@@ -157,7 +166,7 @@ update msg model =
         GotWord result ->
             case result of
                 Ok word ->
-                    ( { model | pageState = Success word }, Cmd.none )
+                    ( { model | pageState = Success word, graph = generateWordGraph word }, Cmd.none )
 
                 Err _ ->
                     ( { model | pageState = Failure }, Cmd.none )
@@ -168,55 +177,73 @@ update msg model =
         RelatedWordLookup word ->
             ( { model | pageState = Loading }, fetchWord word )
 
+        DragStart _ _ ->
+            ( model, Cmd.none )
 
 
----- VIEW ----
--- view : Model -> Html Msg
--- view model =
---     case model.pageState of
---         Failure ->
---             div []
---                 [ Html.text "Failed to load word data. Please look up another word."
---                 , wordLookupInput
---                 , wordLookupButton
---                 ]
---         Loading ->
---             div []
---                 [ Html.text "Loading... If you'd like, you can look up another word"
---                 , wordLookupInput
---                 , wordLookupButton
---                 ]
---         Success word ->
---             div []
---                 [ div [] [ Html.text ("spelling: " ++ word.spelling) ]
---                 , div [] [ Html.text ("language: " ++ word.language.name) ]
---                 , div []
---                     [ Html.text ("definition: " ++ Maybe.withDefault "We seem to be missing this word's definition" word.definition) ]
---                 , div []
---                     [ Html.text "origins: "
---                     , renderRelatedWordList word.origins
---                     ]
---                 , div []
---                     [ Html.text "origin of: "
---                     , renderRelatedWordList word.origin_ofs
---                     ]
---                 , div []
---                     [ Html.text "relations: "
---                     , renderRelatedWordList word.relations
---                     ]
---                 , div []
---                     [ Html.text "derivations: "
---                     , renderRelatedWordList word.derivations
---                     ]
---                 , div []
---                     [ Html.text "derived from: "
---                     , renderRelatedWordList word.derived_froms
---                     ]
---                 , div []
---                     [ wordLookupInput
---                     , wordLookupButton
---                     ]
---                 ]
+
+-- VIEW ----
+
+
+view : Model -> Html Msg
+view model =
+    case model.pageState of
+        Failure ->
+            div []
+                [ Html.text "Failed to load word data. Please look up another word."
+                , wordLookupInput
+                , wordLookupButton
+                ]
+
+        Loading ->
+            div []
+                [ Html.text "Loading... If you'd like, you can look up another word"
+                , wordLookupInput
+                , wordLookupButton
+                ]
+
+        Success word ->
+            svg [ viewBox 0 0 w h ]
+                [ Graph.edges model.graph
+                    |> List.map (linkElement model.graph)
+                    |> g [ class [ "links" ] ]
+                , Graph.nodes model.graph
+                    |> List.map nodeElement
+                    |> g [ class [ "nodes" ] ]
+                ]
+
+
+
+-- div []
+--     [ div [] [ Html.text ("spelling: " ++ word.spelling) ]
+--     , div [] [ Html.text ("language: " ++ word.language.name) ]
+--     , div []
+--         [ Html.text ("definition: " ++ Maybe.withDefault "We seem to be missing this word's definition" word.definition) ]
+--     , div []
+--         [ Html.text "origins: "
+--         , renderRelatedWordList word.origins
+--         ]
+--     , div []
+--         [ Html.text "origin of: "
+--         , renderRelatedWordList word.origin_ofs
+--         ]
+--     , div []
+--         [ Html.text "relations: "
+--         , renderRelatedWordList word.relations
+--         ]
+--     , div []
+--         [ Html.text "derivations: "
+--         , renderRelatedWordList word.derivations
+--         ]
+--     , div []
+--         [ Html.text "derived from: "
+--         , renderRelatedWordList word.derived_froms
+--         ]
+--     , div []
+--         [ wordLookupInput
+--         , wordLookupButton
+--         ]
+--     ]
 
 
 renderRelatedWordSpelling : RelatedWordData -> Html Msg
@@ -247,8 +274,54 @@ wordLookupButton =
 
 
 ---- GRAPHING ----
--- wordGraph : BaseWordData -> List RelatedWordData -> List ( NodeId, NodeId ) -> Graph n
--- wordGraph baseWord relatedWords =
+
+
+generateWordGraph : BaseWordData -> Graph String ()
+generateWordGraph word =
+    let
+        head =
+            [ word.spelling ]
+
+        relatedWordList =
+            List.map (\origin -> origin.spelling) word.origins
+
+        labels =
+            head ++ relatedWordList
+
+        -- convert each word.relation list to a list of just the spellings
+        edges =
+            [ ( 0, 0 )
+            , ( 1, 0 )
+            ]
+    in
+    Graph.fromNodeLabelsAndEdgePairs labels edges
+
+
+updateNode : ( Float, Float ) -> NodeContext Entity () -> NodeContext Entity ()
+updateNode ( x, y ) nodeCtx =
+    let
+        nodeValue =
+            nodeCtx.node.label
+    in
+    updateContextWithValue nodeCtx { nodeValue | x = x, y = y }
+
+
+updateContextWithValue : NodeContext Entity () -> Entity -> NodeContext Entity ()
+updateContextWithValue nodeCtx value =
+    let
+        node =
+            nodeCtx.node
+    in
+    { nodeCtx | node = { node | label = value } }
+
+
+updateGraphWithList : Graph Entity () -> List Entity -> Graph Entity ()
+updateGraphWithList =
+    let
+        graphUpdater value =
+            Maybe.map (\ctx -> updateContextWithValue ctx value)
+    in
+    List.foldr (\node graph -> Graph.update node.id (graphUpdater node) graph)
 
 
 wordGraph : Graph String ()
@@ -290,23 +363,16 @@ nodeElement node =
         , fill (Fill Color.black)
         , stroke (Color.rgba 0 0 0 0)
         , strokeWidth 7
-        , Mouse.onDown node.id
+        , onMouseDown node.id
         , cx node.label.x
         , cy node.label.y
         ]
-        [ title [] [ Html.text node.label.value ] ]
+        [ title [] [ text node.label.value ] ]
 
 
-view : Model -> Svg Msg
-view model =
-    svg [ viewBox 0 0 w h ]
-        [ Graph.edges model.graph
-            |> List.map (linkElement model.graph)
-            |> g [ class [ "links" ] ]
-        , Graph.nodes model.graph
-            |> List.map nodeElement
-            |> g [ class [ "nodes" ] ]
-        ]
+onMouseDown : NodeId -> Attribute Msg
+onMouseDown index =
+    Mouse.onDown (.clientPos >> DragStart index)
 
 
 
@@ -317,7 +383,7 @@ main : Program () Model Msg
 main =
     Browser.element
         { view = view
-        , init = \_ -> init
+        , init = init
         , update = update
         , subscriptions = always Sub.none
         }
