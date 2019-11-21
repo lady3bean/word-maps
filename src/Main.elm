@@ -55,7 +55,7 @@ type alias Model =
 type PageState
     = Failure
     | Loading
-    | Success BaseWordData
+    | Success
 
 
 type Word
@@ -149,6 +149,18 @@ fetchWord word =
         }
 
 
+
+-- will implement a random word API endpoint for this, for now will be hardcoded
+
+
+fetchRandomWord : Cmd Msg
+fetchRandomWord =
+    Http.get
+        { url = apiUrl ++ "-less"
+        , expect = Http.expectJson GotWord baseWordDecoder
+        }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -158,7 +170,20 @@ update msg model =
         GotWord result ->
             case result of
                 Ok word ->
-                    ( { model | pageState = Success word, graph = Graph.mapContexts initializeNode (generateWordGraph word) }, Cmd.none )
+                    let
+                        graph =
+                            Graph.mapContexts initializeNode (generateWordGraph word)
+
+                        link { from, to } =
+                            ( from, to )
+
+                        forces =
+                            [ Force.links <| List.map link <| Graph.edges graph
+                            , Force.manyBody <| List.map .id <| Graph.nodes graph
+                            , Force.center (w / 2) (h / 2)
+                            ]
+                    in
+                    ( { model | pageState = Success, graph = graph, simulation = Force.simulation forces }, Cmd.none )
 
                 Err _ ->
                     ( { model | pageState = Failure }, Cmd.none )
@@ -194,7 +219,7 @@ view model =
                 , wordLookupButton
                 ]
 
-        Success word ->
+        Success ->
             svg [ viewBox 0 0 w h ]
                 [ Graph.edges model.graph
                     |> List.map (linkElement model.graph)
@@ -257,42 +282,16 @@ generateWordGraph word =
             List.map (\origin -> origin.spelling) word.derived_froms
 
         labels =
-            head ++ origins ++ originOfs ++ relations ++ derivations ++ derivedFroms
-
-        indexes =
-            List.indexedMap (\i x -> i) labels
+            Debug.log "labels" (head ++ origins ++ originOfs ++ relations ++ derivations ++ derivedFroms)
 
         edges =
-            List.indexedMap Tuple.pair indexes
+            Debug.log "indexes" (List.indexedMap relateNodes labels)
     in
     Graph.fromNodeLabelsAndEdgePairs labels edges
 
 
-updateNode : ( Float, Float ) -> NodeContext Entity () -> NodeContext Entity ()
-updateNode ( x, y ) nodeCtx =
-    let
-        nodeValue =
-            nodeCtx.node.label
-    in
-    updateContextWithValue nodeCtx { nodeValue | x = x, y = y }
-
-
-updateContextWithValue : NodeContext Entity () -> Entity -> NodeContext Entity ()
-updateContextWithValue nodeCtx value =
-    let
-        node =
-            nodeCtx.node
-    in
-    { nodeCtx | node = { node | label = value } }
-
-
-updateGraphWithList : Graph Entity () -> List Entity -> Graph Entity ()
-updateGraphWithList =
-    let
-        graphUpdater value =
-            Maybe.map (\ctx -> updateContextWithValue ctx value)
-    in
-    List.foldr (\node graph -> Graph.update node.id (graphUpdater node) graph)
+relateNodes i x =
+    ( i, 0 )
 
 
 wordGraph : Graph String ()
