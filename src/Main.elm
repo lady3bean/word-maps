@@ -3,6 +3,7 @@ module Main exposing (..)
 import Browser
 import Browser.Events
 import Color
+import Debug exposing (..)
 import Force exposing (State)
 import Graph exposing (Edge, Graph, Node, NodeContext, NodeId)
 import Html exposing (Html, button, div, input, li, pre, text, ul)
@@ -49,15 +50,6 @@ type alias Model =
     , graph : Graph Entity ()
     , simulation : Force.State NodeId
     }
-
-
-
--- initialModel : Model
--- initialModel =
---     { lookupValue = ""
---     , pageState = Loading
---     , graph =
---     }
 
 
 type PageState
@@ -166,7 +158,7 @@ update msg model =
         GotWord result ->
             case result of
                 Ok word ->
-                    ( { model | pageState = Success word, graph = generateWordGraph word }, Cmd.none )
+                    ( { model | pageState = Success word, graph = Graph.mapContexts initializeNode (generateWordGraph word) }, Cmd.none )
 
                 Err _ ->
                     ( { model | pageState = Failure }, Cmd.none )
@@ -213,39 +205,6 @@ view model =
                 ]
 
 
-
--- div []
---     [ div [] [ Html.text ("spelling: " ++ word.spelling) ]
---     , div [] [ Html.text ("language: " ++ word.language.name) ]
---     , div []
---         [ Html.text ("definition: " ++ Maybe.withDefault "We seem to be missing this word's definition" word.definition) ]
---     , div []
---         [ Html.text "origins: "
---         , renderRelatedWordList word.origins
---         ]
---     , div []
---         [ Html.text "origin of: "
---         , renderRelatedWordList word.origin_ofs
---         ]
---     , div []
---         [ Html.text "relations: "
---         , renderRelatedWordList word.relations
---         ]
---     , div []
---         [ Html.text "derivations: "
---         , renderRelatedWordList word.derivations
---         ]
---     , div []
---         [ Html.text "derived from: "
---         , renderRelatedWordList word.derived_froms
---         ]
---     , div []
---         [ wordLookupInput
---         , wordLookupButton
---         ]
---     ]
-
-
 renderRelatedWordSpelling : RelatedWordData -> Html Msg
 renderRelatedWordSpelling word =
     li [ onClick (RelatedWordLookup word.spelling) ] [ Html.text word.spelling ]
@@ -282,17 +241,29 @@ generateWordGraph word =
         head =
             [ word.spelling ]
 
-        relatedWordList =
+        origins =
             List.map (\origin -> origin.spelling) word.origins
 
-        labels =
-            head ++ relatedWordList
+        originOfs =
+            List.map (\origin -> origin.spelling) word.origin_ofs
 
-        -- convert each word.relation list to a list of just the spellings
+        relations =
+            List.map (\origin -> origin.spelling) word.relations
+
+        derivations =
+            List.map (\origin -> origin.spelling) word.derivations
+
+        derivedFroms =
+            List.map (\origin -> origin.spelling) word.derived_froms
+
+        labels =
+            head ++ origins ++ originOfs ++ relations ++ derivations ++ derivedFroms
+
+        indexes =
+            List.indexedMap (\i x -> i) labels
+
         edges =
-            [ ( 0, 0 )
-            , ( 1, 0 )
-            ]
+            List.indexedMap Tuple.pair indexes
     in
     Graph.fromNodeLabelsAndEdgePairs labels edges
 
