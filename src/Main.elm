@@ -141,8 +141,8 @@ init _ =
     ( Model "test" Loading Nothing graph (Force.simulation forces), Cmd.none )
 
 
-fetchWord : String -> Cmd Msg
-fetchWord word =
+getWord : String -> Cmd Msg
+getWord word =
     Http.get
         { url = apiUrl ++ word
         , expect = Http.expectJson GotWord baseWordDecoder
@@ -165,7 +165,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         FetchWord ->
-            ( { model | pageState = Loading }, fetchWord model.lookupValue )
+            ( { model | pageState = Loading }, getWord model.lookupValue )
 
         GotWord result ->
             case result of
@@ -192,7 +192,7 @@ update msg model =
             ( { model | lookupValue = value }, Cmd.none )
 
         RelatedWordLookup word ->
-            ( { model | pageState = Loading }, fetchWord word )
+            ( { model | pageState = Loading }, getWord word )
 
         DragStart _ _ ->
             ( model, Cmd.none )
@@ -285,12 +285,12 @@ generateWordGraph word =
             Debug.log "labels" (head ++ origins ++ originOfs ++ relations ++ derivations ++ derivedFroms)
 
         edges =
-            Debug.log "indexes" (List.indexedMap relateNodes labels)
+            List.indexedMap relateNodes labels
     in
     Graph.fromNodeLabelsAndEdgePairs labels edges
 
 
-relateNodes i x =
+relateNodes i _ =
     ( i, 0 )
 
 
@@ -333,7 +333,7 @@ nodeElement node =
         , fill (Fill Color.black)
         , stroke (Color.rgba 0 0 0 0)
         , strokeWidth 7
-        , onMouseDown node.id
+        , onClick (RelatedWordLookup node.label.value)
         , cx node.label.x
         , cy node.label.y
         ]
