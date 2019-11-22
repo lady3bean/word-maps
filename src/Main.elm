@@ -138,27 +138,7 @@ init _ =
             , Force.center (w / 2) (h / 2)
             ]
     in
-    ( Model "test" Loading Nothing graph (Force.simulation forces), Cmd.none )
-
-
-getWord : String -> Cmd Msg
-getWord word =
-    Http.get
-        { url = apiUrl ++ word
-        , expect = Http.expectJson GotWord baseWordDecoder
-        }
-
-
-
--- will implement a random word API endpoint for this, for now will be hardcoded
-
-
-fetchRandomWord : Cmd Msg
-fetchRandomWord =
-    Http.get
-        { url = apiUrl ++ "-less"
-        , expect = Http.expectJson GotWord baseWordDecoder
-        }
+    ( Model "test" Loading Nothing graph (Force.simulation forces), fetchRandomWord )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -199,7 +179,40 @@ update msg model =
 
 
 
--- VIEW ----
+---- COMMANDS ----
+
+
+getWord : String -> Cmd Msg
+getWord word =
+    Http.get
+        { url = apiUrl ++ word
+        , expect = Http.expectJson GotWord baseWordDecoder
+        }
+
+
+
+-- TODO: will implement a random word API endpoint for this, for now will be hardcoded
+
+
+fetchRandomWord : Cmd Msg
+fetchRandomWord =
+    Http.get
+        { url = apiUrl ++ "-less"
+        , expect = Http.expectJson GotWord baseWordDecoder
+        }
+
+
+
+-- TODO: fetch the data for each related word and add to the graph in the model
+-- fetchedRelatedWordData : BaseWordData -> Cmd Msg
+-- fetchedRelatedWordData baseword =
+--     List.map (\relatedWord ->
+--         Http.get
+--             { url = apiUrl ++ relatedWord.spelling
+--             , expect = Http.expectJson GotRelatedWord baseWordDecoder
+--         }
+--     )
+---- VIEW ----
 
 
 view : Model -> Html Msg
@@ -266,28 +279,22 @@ generateWordGraph word =
         head =
             [ word.spelling ]
 
-        origins =
-            List.map (\origin -> origin.spelling) word.origins
-
-        originOfs =
-            List.map (\origin -> origin.spelling) word.origin_ofs
-
-        relations =
-            List.map (\origin -> origin.spelling) word.relations
-
-        derivations =
-            List.map (\origin -> origin.spelling) word.derivations
-
-        derivedFroms =
-            List.map (\origin -> origin.spelling) word.derived_froms
-
         labels =
-            Debug.log "labels" (head ++ origins ++ originOfs ++ relations ++ derivations ++ derivedFroms)
+            createRelatedWordLabels word
 
         edges =
             List.indexedMap relateNodes labels
     in
     Graph.fromNodeLabelsAndEdgePairs labels edges
+
+
+createRelatedWordLabels : BaseWordData -> List String
+createRelatedWordLabels baseword =
+    let
+        allWordTypes =
+            baseword.origins ++ baseword.origin_ofs ++ baseword.relations ++ baseword.derivations ++ baseword.derived_froms
+    in
+    List.map (\word -> word.spelling) allWordTypes
 
 
 relateNodes i _ =
